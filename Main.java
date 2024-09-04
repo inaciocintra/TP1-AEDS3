@@ -1,70 +1,235 @@
 import java.io.FileOutputStream;
+import java.io.FileReader;
+import java.io.BufferedReader;
 import java.io.DataOutputStream;
 import java.io.FileNotFoundException;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Date;
+import java.util.Scanner;
 import java.io.IOException;
+import java.io.FileInputStream;
+import java.io.DataInputStream;
 
 public class Main {
     public static void main(String[] args) throws FileNotFoundException {
-        SimpleDateFormat formatodedata = new SimpleDateFormat("dd/MM/yyyy");
 
-        FileOutputStream arq; 
+        // SimpleDateFormat formatodedata = new SimpleDateFormat("dd/MM/yyyy");
+        Scanner entrada = new Scanner(System.in);
+        int operacao;
+        FileOutputStream arq;
         DataOutputStream dos;
-        byte[] ba; 
+        FileInputStream arq2;
+        DataInputStream dis;
 
-        try {
-            // Registro 1
-            Date date = formatodedata.parse("15/07/2016");    
-            ArrayList<String> companies = new ArrayList<>();
-            companies.add("Netflix");
-            companies.add("Lionsgate");
-            companies.add("Paramount");
+        byte[] ba;
 
-            Serie serie = new Serie(1, "Stranger Things", "En", date, companies);
+        ArrayList<Serie> listadeseries = new ArrayList<>();
+        FileReader filereader;
+        BufferedReader bufferedreader;
+        String nomearquivo = "tvs.csv/tvs.csv";
 
-            arq = new FileOutputStream("dados/series.db"); 
-            dos = new DataOutputStream(arq);
-            ba = serie.toByteArray();
-            dos.writeBoolean(true);
-            dos.writeInt(ba.length);
-            dos.write(ba);
-            System.out.println(serie);
+        System.out.println("Qual operação deseja fazer?");
+        System.out.println("-Para escrever no arquivo digite 1");
+        System.out.println("-Para ler do arquivo digite 2");
+        System.out.println("-Para atualizar um registro do arquivo digite 3");
+        System.out.println("-Para excluir um registro digite 4");
+        System.out.println("-Para sair digite qualquer outro numero");
+        operacao = entrada.nextInt();
+        // boolean condiçao ve se ja foi criado o arquivo sequencial das series
+        boolean condicao = false;
+        
+        while (operacao >= 1 && operacao <= 4) {
 
-            // Registro 2
-            Date date1 = formatodedata.parse("01/02/2013");    
-            ArrayList<String> companies1 = new ArrayList<>();
-            companies1.add("Warner");
-            companies1.add("Amazon");
+// ----- CREATE -----
+            if (operacao == 1) {
+                condicao = true;
 
-            Serie serie1 = new Serie(2, "Breaking Bad", "PT", date1, companies1);
+                try {
+                    String linha;
+                    filereader = new FileReader(nomearquivo);
+                    bufferedreader = new BufferedReader(filereader);
+                    bufferedreader.readLine();
+                    // le as linhas do csv até o fim/null
+                    while ((linha = bufferedreader.readLine()) != null) {
 
-            ba = serie1.toByteArray();
-            dos.writeBoolean(true);
-            dos.writeInt(ba.length);
-            dos.write(ba);
-            System.out.println(serie1);
+                        Serie serie = new Serie();
+                        // passa a linha para o metodo ler que ira setar os atributos de cada serie na Serie.java
+                        serie.ler(linha);
+                        listadeseries.add(serie);
 
-            // Registro 3
-            Date date2 = formatodedata.parse("23/05/2019");    
-            ArrayList<String> companies2 = new ArrayList<>();
-            companies2.add("HBO");
-            companies2.add("Sky Atlantic");
+                        arq = new FileOutputStream("dados/series.db", true);
+                        dos = new DataOutputStream(arq);
 
-            Serie serie2 = new Serie(3, "Chernobyl", "En", date2, companies2);
+                        // converte cada objeto de serie criada para byte array
+                        ba = serie.toByteArray();
+                        // escreve a lapide (o true significa que o registro depois dela ainda está
+                        // válido/existe, ou seja nao foi excluido) no arquivo sequencial
+                        dos.writeBoolean(true); // lapide
+                        // escreve o tamanho do registro da serie no aqrquivo sequencial
+                        dos.writeInt(ba.length);
+                        // escreve o registro inteiro da serie no aqrquivo sequencial
+                        dos.write(ba);
 
-            ba = serie2.toByteArray();
-            dos.writeBoolean(true);
-            dos.writeInt(ba.length);
-            dos.write(ba);
-            System.out.println(serie2);
+                    }
+                    filereader.close();
+                    bufferedreader.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
 
-            dos.close(); // Fecha o DataOutputStream
-            arq.close(); // Fecha o FileOutputStream
-        } catch (ParseException | IOException e) {
-            System.out.println("Error: " + e.getMessage());
+                }
+            }
+
+// ----- READ -----
+            else if (operacao == 2) {
+                int idserie;
+                System.out.println("Digite o id da serie que você quer buscar/ler: ");
+                idserie = entrada.nextInt();
+                // se o arquivo sequencial ja tiver sido criado e o id
+                if (condicao && idserie >= 1 && idserie <= 1094) {
+                    try {
+
+                        arq2 = new FileInputStream("dados/series.db");
+                        dis = new DataInputStream(arq2);
+
+                        boolean encontrou = false;
+
+                        // dis.available indica quantos bytes ainda restam para serem lidos no arquivo
+                        // ou stream
+                        while (dis.available() > 0) {
+                            boolean lapide = dis.readBoolean(); // Lê a lápide, que indica se o registro está ativo
+                            int tamanhoRegistro = dis.readInt(); // Lê o tamanho do registro em bytes
+                            ba = new byte[tamanhoRegistro];
+                            dis.readFully(ba); // lê exatamente o número de bytes especificado pelo tamanho do array ba
+                                               // e os armazena nesse array
+
+                            if (lapide) { // Se o registro está ativo (não foi excluído)
+                                Serie serie = new Serie();
+                                serie.fromByteArray(ba); // Reconstrói o objeto `Serie` a partir do byte array
+
+                                if (serie.getId() == idserie) { // Verifica se é o ID procurado
+                                    encontrou = true;
+                                    System.out.println("Série encontrada:");
+                                    System.out.println("ID: " + serie.getId());
+                                    System.out.println("Nome: " + serie.getName());
+                                    System.out.println("Idioma: " + serie.getLanguage());
+                                    System.out.println("Data de estreia: " + serie.getDate());
+                                    System.out.println("Empresas: " + String.join(", ", serie.getCompanies()));
+                                    break; // Sai do loop após encontrar a série
+                                }
+                            }
+                        }
+
+                        if (!encontrou) {
+                            System.out.println("Série com ID " + idserie + " não encontrada.");
+                        }
+
+                        dis.close();
+                    } catch (IOException e) {
+                        System.out.println("Erro ao ler o arquivo: " + e.getMessage());
+                    }
+
+                }
+
+                else {
+                    // caso os registros das series ainda nao tenha sido criado, ele escreve no
+                    // arquivo sequencial todas elas (faz o create) e depois le o id desejado
+                    condicao = true;
+                    try {
+                        String linha;
+                        filereader = new FileReader(nomearquivo);
+                        bufferedreader = new BufferedReader(filereader);
+                        bufferedreader.readLine();
+
+                        // le as linhas do csv até o fim/null
+                        while ((linha = bufferedreader.readLine()) != null) {
+
+                            Serie serie = new Serie();
+                            // passa a linha para o metodo ler que ira setar os atributos de cada serie na Serie.java
+                            serie.ler(linha);
+                            listadeseries.add(serie);
+
+                            arq = new FileOutputStream("dados/series.db", true);
+                            dos = new DataOutputStream(arq);
+
+                            // converte cada objeto de serie criada para byte array
+                            ba = serie.toByteArray();
+                            // escreve a lapide (o true significa que o registro depois dela ainda está
+                            // válido/existe, ou seja nao foi excluido) no arquivo sequencial
+                            dos.writeBoolean(true); // lapide
+                            // escreve o tamanho do registro da serie no aqrquivo sequencial
+                            dos.writeInt(ba.length);
+                            // escreve o registro inteiro da serie no aqrquivo sequencial
+                            dos.write(ba);
+
+                        }
+                        filereader.close();
+                        bufferedreader.close();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+
+                    }
+                    try {
+
+                        arq2 = new FileInputStream("dados/series.db");
+                        dis = new DataInputStream(arq2);
+
+                        boolean encontrou = false;
+
+                        // dis.available indica quantos bytes ainda restam para serem lidos no arquivo
+                        // ou stream
+                        while (dis.available() > 0) {
+                            boolean lapide = dis.readBoolean(); // Lê a lápide, que indica se o registro está ativo
+                            int tamanhoRegistro = dis.readInt(); // Lê o tamanho do registro em bytes
+                            ba = new byte[tamanhoRegistro];
+                            dis.readFully(ba); // lê exatamente o número de bytes especificado pelo tamanho do array ba
+                                               // e os armazena nesse array
+
+                            if (lapide) { // Se o registro está ativo (não foi excluído)
+                                Serie serie = new Serie();
+                                serie.fromByteArray(ba); // Reconstrói o objeto `Serie` a partir do byte array
+
+                                if (serie.getId() == idserie) { // Verifica se é o ID procurado
+                                    encontrou = true;
+                                    System.out.println("Série encontrada:");
+                                    System.out.println("ID: " + serie.getId());
+                                    System.out.println("Nome: " + serie.getName());
+                                    System.out.println("Idioma: " + serie.getLanguage());
+                                    System.out.println("Data de estreia: " + serie.getDate());
+                                    System.out.println("Empresas: " + String.join(", ", serie.getCompanies()));
+                                    break; // Sai do loop após encontrar a série
+                                }
+                            }
+                        }
+
+                        if (!encontrou) {
+                            System.out.println("Série com ID " + idserie + " não encontrada.");
+                        }
+
+                        dis.close();
+                    } catch (IOException e) {
+                        System.out.println("Erro ao ler o arquivo: " + e.getMessage());
+                    }
+
+                }
+
+            }
+            // ----- UPDATE -----
+            // else if(operacao ==3){
+
+            // }
+            // else if(operacao ==4){
+
+            // }
+            // else{}
+
+            System.out.println("Qual operação deseja fazer?");
+            System.out.println("-Para escrever no arquivo digite 1");
+            System.out.println("-Para ler do arquivo digite 2");
+            System.out.println("-Para atualizar um registro do arquivo digite 3");
+            System.out.println("-Para excluir um registro digite 4");
+            System.out.println("-Para sair digite qualquer outro numero");
+            operacao = entrada.nextInt();
+
         }
+        entrada.close();
     }
 }

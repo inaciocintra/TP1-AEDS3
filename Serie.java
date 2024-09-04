@@ -1,5 +1,6 @@
 import java.util.Scanner;
 import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -7,6 +8,7 @@ import java.util.Date;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
 import java.io.DataOutputStream;
 
 class Serie {
@@ -77,11 +79,12 @@ class Serie {
         return companies;
     } 
     public void setCompanies(String companies){
+        if (!(companies.equals("-")))
         this.companies.add(companies);
     }
 
-    // Método read
-    public void readCsv(String line){
+    // le a linha do csv fornecida, separa por ; e seta atributo por atributo desse novo objeto
+    public void ler(String line){
         // Splita a linha
         String data[] = line.split(";");
         if(data.length >= 5){
@@ -115,17 +118,44 @@ class Serie {
         dos.writeUTF(name);
         dos.writeUTF(language);
         
-        // Converte a data para segundos antes de escrever
+        //Converte a data para segundos antes de escrever
         long dateInSeconds = first_air_date.getTime();
         dos.writeLong(dateInSeconds);
 
         // Escrever o ArrayList de Strings (companias)
         dos.writeInt(companies.size());  // Primeiro, o tamanho da lista
-        for(String company : companies) {
-            dos.writeUTF(company);       // Escreve cada String da lista
+        StringBuilder companiesString = new StringBuilder();
+        for (int i = 0; i < companies.size(); i++) {
+            companiesString.append(companies.get(i));
+            if (i < companies.size() - 1) {
+                companiesString.append(",");  // Adiciona vírgula entre os nomes das companhias
+            }
         }
+        dos.writeUTF(companiesString.toString());
 
         dos.close();
         return baos.toByteArray();
+    }
+
+    public void fromByteArray(byte[] ba) throws IOException {
+        ByteArrayInputStream bais = new ByteArrayInputStream(ba);
+        DataInputStream dis = new DataInputStream(bais);
+    
+        this.id = dis.readInt();
+        this.name = dis.readUTF();
+        this.language = dis.readUTF();
+    
+        long dateInSeconds = dis.readLong();
+        this.first_air_date = new Date(dateInSeconds);
+    
+        int numCompanies = dis.readInt();
+        this.companies = new ArrayList<>();
+        String companiesString = dis.readUTF();
+        String[] companiesArray = companiesString.split(",");
+        for (String company : companiesArray) {
+            this.companies.add(company);
+        }
+    
+        dis.close();
     }
 }
