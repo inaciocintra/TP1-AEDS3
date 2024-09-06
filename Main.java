@@ -2,9 +2,11 @@ import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.BufferedReader;
 import java.io.DataOutputStream;
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.Scanner;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -38,12 +40,13 @@ public class Main {
         System.out.println("-Para atualizar um registro do arquivo digite 3");
         System.out.println("-Para excluir um registro digite 4");
         System.out.println("-Para criar um registro digite 5");
-        System.out.println("-Para sair digite 6 ou qualquer outro numero maior");
+        System.out.println("-Para ordenar um registro digite 6");
+        System.out.println("-Para sair digite 7 ou qualquer outro numero maior");
         operacao = entrada.nextInt();
         // boolean condiçao ve se ja foi criado o arquivo sequencial das series
         boolean condicao = false;
 
-        while (operacao >= 1 && operacao <= 5) {
+        while (operacao >= 1 && operacao <= 6) {
 
 // ----- CARREGA REGISTRO -----
             if (operacao == 1) {
@@ -695,9 +698,25 @@ public class Main {
 
                 } 
              }
-             else{
-                operacao = 6;
-             }
+             else if(operacao == 6){
+                try {
+                    // 1. Distribui os registros do arquivo original em arquivos temporários
+                    int tamanhoMemoria = 100;
+                    distribuirSeriesParaArquivos("dados/series.db", tamanhoMemoria);
+    
+                    // 2. Faz a intercalação dos arquivos temporários gerados
+                    String nomeArquivoOrdenado = "dados/series_ordenadas.db";
+
+                    int numeroDeArquivos = contarArquivosTemporarios(); // Quantos arquivos temporários foram gerados na fase de distribuição
+                    intercalarArquivos(numeroDeArquivos, nomeArquivoOrdenado);
+    
+                    System.out.println("Arquivo ordenado com sucesso!");
+                } catch (IOException e) {
+                    System.out.println("Erro ao ordenar o arquivo: " + e.getMessage());
+                }
+            } else {
+                operacao = 7;
+            } 
 
             System.out.println("\nQual operação deseja fazer?");
             System.out.println("-Para carregar o arquivo digite 1");
@@ -705,10 +724,144 @@ public class Main {
             System.out.println("-Para atualizar um registro do arquivo digite 3");
             System.out.println("-Para excluir um registro digite 4");
             System.out.println("-Para criar um registro digite 5"); 
-            System.out.println("-Para sair digite 6 ou qualquer outro numero maior");
+            System.out.println("-Para ordenar um registro digite 6"); 
+            System.out.println("-Para sair digite 7 ou qualquer outro numero maior");
             operacao = entrada.nextInt();
 
         }
         entrada.close();
     }
+    public static int contarArquivosTemporarios() {
+        int contador = 0;
+        while (true) {
+            File arquivo = new File("bloco" + contador + ".tmp");
+            if (arquivo.exists()) {
+                contador++;
+            } else {
+                break;
+            }
+        }
+        return contador;
+    }
+
+    public static void distribuirSeriesParaArquivos(String nomeArquivoEntrada, int tamanhoMemoria) throws IOException {
+        RandomAccessFile entrada = new RandomAccessFile(nomeArquivoEntrada, "r");
+        int contadorArquivo = 0;
+    
+        while (entrada.getFilePointer() < entrada.length()) {
+            ArrayList<Serie> listaSeries = new ArrayList<>();
+            
+            // Carrega os registros na memória até o limite especificado
+            for (int i = 0; i < tamanhoMemoria && entrada.getFilePointer() < entrada.length(); i++) {
+                boolean lapide = entrada.readBoolean();
+                int tamanhoRegistro = entrada.readInt();
+                byte[] ba = new byte[tamanhoRegistro];
+                entrada.readFully(ba);
+    
+                if (lapide) {
+                    Serie serie = new Serie();
+                    serie.fromByteArray(ba);
+                    listaSeries.add(serie);
+                }
+            }
+    
+            // Ordena o bloco de séries carregadas na memória por ID
+            listaSeries.sort(Comparator.comparingInt(Serie::getId));
+    
+            // Grava o bloco ordenado em um novo arquivo temporário
+            String nomeArquivoTemporario = "bloco" + contadorArquivo + ".tmp";
+            RandomAccessFile tempFile = new RandomAccessFile(nomeArquivoTemporario, "rw");
+    
+            for (Serie serie : listaSeries) {
+                byte[] ba = serie.toByteArray();
+                tempFile.writeBoolean(true); // Lápide
+                tempFile.writeInt(ba.length); // Tamanho do registro
+                tempFile.write(ba); // Registro da série
+            }
+    
+            tempFile.close();
+            contadorArquivo++;
+        }
+    
+        entrada.close();
+    }
+
+    public static void intercalarArquivos(int numeroDeArquivos, String arquivoSaida) throws IOException {
+    // Array de RandomAccessFiles para cada arquivo temporário
+    RandomAccessFile[] arquivos = new RandomAccessFile[numeroDeArquivos];
+    for (int i = 0; i < numeroDeArquivos; i++) {
+        arquivos[i] = new RandomAccessFile("bloco" + i + ".tmp", "r");
+    }
+
+    // Arquivo de saída final
+    RandomAccessFile saida = new RandomAccessFile(arquivoSaida, "rw");
+
+    // Array para armazenar o último registro lido de cada arquivo
+    Serie[] seriesCorrentes = new Serie[numeroDeArquivos];
+    boolean[] lapides = new boolean[numeroDeArquivos];
+    byte[][] buffers = new byte[numeroDeArquivos][];
+
+    // Carrega o primeiro registro de cada arquivo temporário
+    for (int i = 0; i < numeroDeArquivos; i++) {
+        if (arquivos[i].getFilePointer() < arquivos[i].length()) {
+            lapides[i] = arquivos[i].readBoolean();
+            int tamanhoRegistro = arquivos[i].readInt();
+            buffers[i] = new byte[tamanhoRegistro];
+            arquivos[i].readFully(buffers[i]);
+
+            if (lapides[i]) {
+                seriesCorrentes[i] = new Serie();
+                seriesCorrentes[i].fromByteArray(buffers[i]);
+            }
+        }
+    }
+
+    // Enquanto houver registros em qualquer arquivo temporário
+    while (true) {
+        int indiceMenor = -1;
+        Serie menorSerie = null;
+
+        // Encontra o menor registro entre os arquivos
+        for (int i = 0; i < numeroDeArquivos; i++) {
+            if (seriesCorrentes[i] != null && (menorSerie == null || seriesCorrentes[i].getId() < menorSerie.getId())) {
+                menorSerie = seriesCorrentes[i];
+                indiceMenor = i;
+            }
+        }
+
+        // Se não houver mais registros para intercalar, termina
+        if (indiceMenor == -1) {
+            break;
+        }
+
+        // Escreve o menor registro no arquivo de saída
+        byte[] ba = menorSerie.toByteArray();
+        saida.writeBoolean(true); // Lápide
+        saida.writeInt(ba.length); // Tamanho do registro
+        saida.write(ba); // Registro da série
+
+        // Carrega o próximo registro do arquivo que tinha o menor
+        if (arquivos[indiceMenor].getFilePointer() < arquivos[indiceMenor].length()) {
+            lapides[indiceMenor] = arquivos[indiceMenor].readBoolean();
+            int tamanhoRegistro = arquivos[indiceMenor].readInt();
+            buffers[indiceMenor] = new byte[tamanhoRegistro];
+            arquivos[indiceMenor].readFully(buffers[indiceMenor]);
+
+            if (lapides[indiceMenor]) {
+                seriesCorrentes[indiceMenor] = new Serie();
+                seriesCorrentes[indiceMenor].fromByteArray(buffers[indiceMenor]);
+            } else {
+                seriesCorrentes[indiceMenor] = null;
+            }
+        } else {
+            seriesCorrentes[indiceMenor] = null;
+        }
+    }
+
+    // Fecha os arquivos temporários e o arquivo de saída
+    for (RandomAccessFile arquivo : arquivos) {
+        arquivo.close();
+    }
+    saida.close();
+}
 }
