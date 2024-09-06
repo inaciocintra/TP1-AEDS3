@@ -33,18 +33,19 @@ public class Main {
         String nomearquivo = "tvs.csv/tvs.csv";
 
         System.out.println("Qual operação deseja fazer?");
-        System.out.println("-Para escrever no arquivo digite 1");
+        System.out.println("-Para carregar o arquivo digite 1");
         System.out.println("-Para ler do arquivo digite 2");
         System.out.println("-Para atualizar um registro do arquivo digite 3");
         System.out.println("-Para excluir um registro digite 4");
-        System.out.println("-Para sair digite qualquer outro numero");
+        System.out.println("-Para criar um registro digite 5");
+        System.out.println("-Para sair digite 6 ou qualquer outro numero maior");
         operacao = entrada.nextInt();
         // boolean condiçao ve se ja foi criado o arquivo sequencial das series
         boolean condicao = false;
 
-        while (operacao >= 1 && operacao <= 4) {
+        while (operacao >= 1 && operacao <= 5) {
 
-// ----- CREATE -----
+// ----- CARREGA REGISTRO -----
             if (operacao == 1) {
                 condicao = true;
 
@@ -135,7 +136,7 @@ public class Main {
                 }
 
                 else {
-                    // caso os registros das series ainda nao tenha sido criado, ele escreve no arquivo sequencial todas elas (faz o create) e depois le o id desejado
+                    // caso os registros das series ainda nao tenha sido criado, ele escreve no arquivo sequencial todas elas (faz o carregamento de td) e depois le o id desejado
                     condicao = true;
                     try {
                         String linha;
@@ -222,7 +223,7 @@ public class Main {
                 int idserie;
                 System.out.println("Qual id você deseja atualizar: ");
                 idserie = entrada.nextInt();
-                if (condicao && idserie >= 1 && idserie <= 1094) {
+                if (condicao) {
 
         try {
         RandomAccessFile arqq = new RandomAccessFile("dados/series.db", "rw");
@@ -310,7 +311,7 @@ public class Main {
     }
                 }
                 else{
-                    // caso os registros das series ainda nao tenha sido criado, ele escreve no arquivo sequencial todas elas (faz o create) e depois atualiza o id desejado
+                    // caso os registros das series ainda nao tenha sido criado, ele escreve no arquivo sequencial todas elas (faz o carregamento de td) e depois atualiza o id desejado
                     condicao = true;
                     try {
                         String linha;
@@ -483,7 +484,7 @@ public class Main {
                 }
 
                 else{
-                    // caso os registros das series ainda nao tenha sido criado, ele escreve no arquivo sequencial todas elas (faz o create) e depois exclui o id desejado
+                    // caso os registros das series ainda nao tenha sido criado, ele escreve no arquivo sequencial todas elas (faz o carregamento de td) e depois exclui o id desejado
                     condicao = true;
                     try {
                         String linha;
@@ -564,8 +565,137 @@ public class Main {
                 }
 
              }
+// ----- CREATE -----
+             else if (operacao ==5){
+                if(condicao){
+
+                    try {
+                        // Solicitar os dados do usuário para o novo registro
+                        System.out.println("Digite os atributos da nova série:");
+                        System.out.print("ID: ");
+                        int novoId = entrada.nextInt();
+                        entrada.nextLine(); // Consumir a nova linha
+                
+                        System.out.print("Nome: ");
+                        String novoNome = entrada.nextLine();
+                
+                        System.out.print("Idioma: ");
+                        String novoIdioma = entrada.nextLine();
+                
+                        System.out.print("Data de estreia (dd/MM/yyyy): ");
+                        String novaDataStr = entrada.nextLine();
+                        SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy");
+                        Date novaData = sdf.parse(novaDataStr);
+                
+                        System.out.print("Empresas (separadas por vírgula): ");
+                        String empresasStr = entrada.nextLine();
+                        ArrayList<String> novasEmpresas = new ArrayList<>(Arrays.asList(empresasStr.split(",")));
+                
+                        // Criar uma nova instância de Serie com os dados fornecidos pelo usuário
+                        Serie novaSerie = new Serie(novoId, novoNome, novoIdioma, novaData, novasEmpresas);
+                        byte[] novoBa = novaSerie.toByteArray();
+                
+                        // Abrir o arquivo em modo de escrita/append
+                        RandomAccessFile arqq = new RandomAccessFile("dados/series.db", "rw");
+                        arqq.seek(arqq.length()); // Move para o final do arquivo
+                
+                        // Escrever a lápide, tamanho do registro e os dados da série no final do arquivo
+                        arqq.writeBoolean(true); // Lápide ativa
+                        arqq.writeInt(novoBa.length); // Tamanho do registro
+                        arqq.write(novoBa); // Escreve os dados da série
+                
+                        System.out.println("Nova série criada com sucesso no final do arquivo.");
+                        arqq.close();
+                
+                    } catch (IOException | ParseException e) {
+                        System.out.println("Erro ao criar novo registro: " + e.getMessage());
+                    }
+                }
+                else{
+                    // caso os registros das series ainda nao tenha sido criado, ele escreve no arquivo sequencial todas elas (faz o carregamento de td) e depois permite a criaçao de novos registros
+                    condicao = true;
+                    try {
+                        String linha;
+                        filereader = new FileReader(nomearquivo);
+                        bufferedreader = new BufferedReader(filereader);
+                        bufferedreader.readLine();
+
+                        // le as linhas do csv até o fim/null
+                        while ((linha = bufferedreader.readLine()) != null) {
+
+                            Serie serie = new Serie();
+                            // passa a linha para o metodo ler que ira setar os atributos de cada serie na Serie.java
+                            
+                            serie.ler(linha);
+                            listadeseries.add(serie);
+
+                            arq = new FileOutputStream("dados/series.db", true);
+                            dos = new DataOutputStream(arq);
+
+                            // converte cada objeto de serie criada para byte array
+                            ba = serie.toByteArray();
+                            // escreve a lapide (o true significa que o registro depois dela ainda está
+                            // válido/existe, ou seja nao foi excluido) no arquivo sequencial
+                            dos.writeBoolean(true); // lapide
+                            // escreve o tamanho do registro da serie no aqrquivo sequencial
+                            dos.writeInt(ba.length);
+                            // escreve o registro inteiro da serie no aqrquivo sequencial
+                            dos.write(ba);
+
+                        }
+                        filereader.close();
+                        bufferedreader.close();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+
+                    }
+                    try {
+                        // Solicitar os dados do usuário para o novo registro
+                        System.out.println("Digite os atributos da nova série:");
+                        System.out.print("ID: ");
+                        int novoId = entrada.nextInt();
+                        entrada.nextLine(); // Consumir a nova linha
+                
+                        System.out.print("Nome: ");
+                        String novoNome = entrada.nextLine();
+                
+                        System.out.print("Idioma: ");
+                        String novoIdioma = entrada.nextLine();
+                
+                        System.out.print("Data de estreia (dd/MM/yyyy): ");
+                        String novaDataStr = entrada.nextLine();
+                        SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy");
+                        Date novaData = sdf.parse(novaDataStr);
+                
+                        System.out.print("Empresas (separadas por vírgula): ");
+                        String empresasStr = entrada.nextLine();
+                        ArrayList<String> novasEmpresas = new ArrayList<>(Arrays.asList(empresasStr.split(",")));
+                
+                        // Criar uma nova instância de Serie com os dados fornecidos pelo usuário
+                        Serie novaSerie = new Serie(novoId, novoNome, novoIdioma, novaData, novasEmpresas);
+                        byte[] novoBa = novaSerie.toByteArray();
+                
+                        // Abrir o arquivo em modo de escrita/append
+                        RandomAccessFile arqq = new RandomAccessFile("dados/series.db", "rw");
+                        arqq.seek(arqq.length()); // Move para o final do arquivo
+                
+                        // Escrever a lápide, tamanho do registro e os dados da série no final do arquivo
+                        arqq.writeBoolean(true); // Lápide ativa
+                        arqq.writeInt(novoBa.length); // Tamanho do registro
+                        arqq.write(novoBa); // Escreve os dados da série
+                
+                        System.out.println("Nova série criada com sucesso no final do arquivo.");
+                        arqq.close();
+                
+                    } catch (IOException | ParseException e) {
+                        System.out.println("Erro ao criar novo registro: " + e.getMessage());
+                    }
+
+
+                }
+             }
              else{
-                operacao = 5;
+                operacao = 6;
              }
 
             System.out.println("\nQual operação deseja fazer?");
@@ -573,7 +703,8 @@ public class Main {
             System.out.println("-Para ler do arquivo digite 2");
             System.out.println("-Para atualizar um registro do arquivo digite 3");
             System.out.println("-Para excluir um registro digite 4");
-            System.out.println("-Para sair digite 5 ou qualquer outro numero maior");
+            System.out.println("-Para criar um registro digite 5"); 
+            System.out.println("-Para sair digite 6 ou qualquer outro numero maior");
             operacao = entrada.nextInt();
 
         }
