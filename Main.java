@@ -611,6 +611,7 @@ public class Main {
                         System.out.println("Erro ao criar novo registro: " + e.getMessage());
                     }
                 }
+                 
                 else{
                     // caso os registros das series ainda nao tenha sido criado, ele escreve no arquivo sequencial todas elas (faz o carregamento de td) e depois permite a criaçao de novos registros
                     condicao = true;
@@ -692,14 +693,14 @@ public class Main {
                     }
 
 
-                }
+                } 
              }
              else{
                 operacao = 6;
              }
 
             System.out.println("\nQual operação deseja fazer?");
-            System.out.println("-Para escrever no arquivo digite 1");
+            System.out.println("-Para carregar o arquivo digite 1");
             System.out.println("-Para ler do arquivo digite 2");
             System.out.println("-Para atualizar um registro do arquivo digite 3");
             System.out.println("-Para excluir um registro digite 4");
